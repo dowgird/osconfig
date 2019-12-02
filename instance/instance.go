@@ -19,6 +19,8 @@ import (
 	"bytes"
 	"encoding/json"
 
+	"cloud.google.com/go/compute/metadata"
+
 	agentendpointpb "github.com/GoogleCloudPlatform/osconfig/_internal/gapi-cloud-osconfig-go/google.golang.org/genproto/googleapis/cloud/osconfig/agentendpoint/v1alpha1"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
@@ -66,6 +68,15 @@ func ParseLocalConfig(a []byte) (rv LocalConfig, e error) {
 	return
 }
 
+func ReadLocalConfig() (config LocalConfig, e error) {
+	s, e := metadata.Get("/instance/attributes/gce-software-declaration")
+	if e != nil {
+		return
+	}
+	config, e = ParseLocalConfig([]byte(s))
+	return
+}
+
 // GetId returns a repository Id that is used to group repositories for
 // override by higher priotiry policy(-ies).
 // For repositories that have no such Id, GetId returns nil, in which
@@ -86,7 +97,7 @@ func GetId(repo agentendpointpb.PackageRepository) *string {
 
 // MergeConfigs merges the local config with the lookup response, giving priority to the global
 // response.
-func MergeConfigs(local LocalConfig, global agentendpointpb.LookupEffectiveGuestPoliciesResponse) (r agentendpointpb.LookupEffectiveGuestPoliciesResponse) {
+func MergeConfigs(local LocalConfig, global *agentendpointpb.LookupEffectiveGuestPoliciesResponse) (r agentendpointpb.LookupEffectiveGuestPoliciesResponse) {
 	// Ids that are in the maps below
 	repos := make(map[string]bool)
 	pkgs := make(map[string]bool)

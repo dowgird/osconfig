@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/guest-logging-go/logger"
 	"github.com/GoogleCloudPlatform/osconfig/agentendpoint"
 	"github.com/GoogleCloudPlatform/osconfig/config"
+	"github.com/GoogleCloudPlatform/osconfig/instance"
 	"github.com/GoogleCloudPlatform/osconfig/inventory/packages"
 	"github.com/GoogleCloudPlatform/osconfig/policies/recipes"
 	"github.com/GoogleCloudPlatform/osconfig/tasker"
@@ -35,23 +36,33 @@ import (
 )
 
 func run(ctx context.Context) {
+	var resp *agentendpointpb.LookupEffectiveGuestPoliciesResponse
+
 	client, err := agentendpoint.NewClient(ctx)
 	if err != nil {
 		logger.Errorf("agentendpoint.NewClient Error: %v", err)
-		return
+	} else {
+		defer client.Close()
+		var err error
+		resp, err = client.LookupEffectiveGuestPolicies(ctx)
+		if err != nil {
+			logger.Errorf("Error running GuestPolicies: %v", err)
+			resp = nil
+		}
 	}
-	defer client.Close()
 
-	resp, err := client.LookupEffectiveGuestPolicies(ctx)
+	local, err := instance.ReadLocalConfig()
 	if err != nil {
-		logger.Errorf("Error running GuestPolicies: %v", err)
-		return
+		logger.Errorf("Error reading local software config: %v", err)
+		local = instance.LocalConfig{}
 	}
+
+	effectiveResp := instance.MergeConfigs(local, resp)
 
 	// We don't check the error from ospackage.SetConfig as all errors are already logged.
-	setConfig(resp)
+	setConfig(&effectiveResp)
 
-	installRecipes(ctx, resp)
+	installRecipes(ctx, &effectiveResp)
 }
 
 // Run looks up osconfigs and applies them using tasker.Enqueue.
