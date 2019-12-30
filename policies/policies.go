@@ -51,6 +51,8 @@ func run(ctx context.Context) {
 	local, err := readLocalConfig()
 	if err != nil {
 		logger.Errorf("Error reading local software config: %v", err)
+	} else {
+		logger.Debugf("Got local software config: %+v", local)
 	}
 
 	effective := mergeConfigs(local, resp)
